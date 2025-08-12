@@ -1,0 +1,97 @@
+@page "/eventmgr"
+@using EventEaseApp
+@using System.Threading.Tasks
+@inject IJSRuntime JSRuntime
+@inject EventService EventService
+
+<h3>Add New Event</h3>
+
+<EditForm Model="@newEvent" OnValidSubmit="AddEvent">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label id="eventNameLabel">Event Name:</label>
+        <InputText id="eventName" @bind-Value="newEvent.Name" class="form-control" />
+    </div>
+
+    <div>
+        <label id="eventDescriptionLabel">Description:</label>
+        <InputTextArea id="eventDescription" @bind-Value="newEvent.Description" class="form-control" />
+    </div>
+
+    <div>
+        <label id="eventLocationLabel">Location:</label>
+        <InputText id="eventLocation" @bind-Value="newEvent.Location" class="form-control" />
+    </div>
+
+    <div>
+        <label id="eventDateLabel">Date:</label>
+        <InputDate id="eventDate" @bind-Value="newEvent.Date" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-2" disabled="@isSaving">
+        @(isSaving ? "Saving..." : "Add Event")
+    </button>
+</EditForm>
+
+<h3>Manage Events</h3>
+
+<ul class="list-group">
+    @foreach (var e in EventService.GetEvents())
+    {
+        <li class="list-group-item @(e.IsCompleted ? "list-group-item-secondary" : "")">
+            <strong>@e.Name</strong>
+            @if (e.IsCompleted)
+            {
+                <span class="badge bg-secondary ms-2">Completed</span>
+            }
+            <br />
+            @e.Description<br />
+            <em>@e.Location</em><br />
+            <small>@e.Date.ToShortDateString()</small><br />
+
+            <a class="btn btn-warning btn-sm mt-2" href="/edit-event/@e.Id">Edit Event</a>
+            <button class="btn btn-secondary btn-sm mt-2" @onclick="() => MarkCompleted(e)">Event Completed</button>
+            <button class="btn btn-danger btn-sm mt-2" @onclick="() => DeleteEvent(e)">Delete</button>
+
+            <h4 class="mt-3">Registrations</h4>
+            @foreach (var r in EventService.GetRegistrations().Where(r => r.RegisteredEvent?.Id == e.Id))
+            {
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>@r.AttendeeName (@r.Email)</span>
+                </div>
+            }
+        </li>
+    }
+
+</ul>
+
+
+@code {
+    private Event newEvent = new Event();
+    private bool isSaving = false;
+
+    private async Task AddEvent()
+    {
+        isSaving = true;
+        await Task.Delay(1000); // Simulate saving
+        await EventService.AddEvent(newEvent);
+        newEvent = new Event(); // Reset form
+        isSaving = false;
+    }
+
+    private async Task MarkCompleted(Event e)
+    {
+        e.IsCompleted = true;
+        await EventService.UpdateEvent(e);
+    }
+
+    private async Task DeleteEvent(Event e)
+    {
+        await EventService.DeleteEvent(e);
+        StateHasChanged(); // Refresh UI
+    }
+
+
+}

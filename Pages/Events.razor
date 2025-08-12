@@ -1,0 +1,73 @@
+@page "/events"
+@inject EventService EventService
+@inject LocalSessionService SessionTracker
+
+<h3>Available Events</h3>
+
+@if (string.IsNullOrEmpty(userName))
+{
+    <p class="text-warning">⚠️ Please log in to register for events.</p>
+}
+else
+{
+    <p class="text-success">Welcome, <strong>@userName</strong>!</p>
+}
+
+@if (activeEvents.Count == 0)
+{
+    <p class="text-muted">No upcoming events.</p>
+}
+else
+{
+    <ul class="list-group">
+        @foreach (var e in activeEvents)
+        {
+            <li class="list-group-item">
+                <strong>@e.Name</strong><br />
+                @e.Description<br />
+                <em>@e.Location</em><br />
+                <small>@e.Date.ToShortDateString()</small><br />
+
+                @if (string.IsNullOrEmpty(userName))
+                {
+                    <span class="text-danger mt-2">🔒 Log in to register</span>
+                }
+                else if (!EventService.HasRegistered(e.Id, userName))
+                {
+                    <a class="btn btn-primary btn-sm mt-2" href="/register/@e.Id">Register</a>
+                }
+                else
+                {
+                    <span class="text-success mt-2">✅ Registered</span>
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Event> activeEvents = new();
+    private List<Event> registeredEvents = new();
+    private string? userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var visits = await SessionTracker.GetObjectAsync<List<string>>("pageVisits") ?? new();
+        visits.Add("Visited Events at " + DateTime.Now);
+        await SessionTracker.SetObjectAsync("pageVisits", visits);
+
+        userName = await SessionTracker.GetItemAsync("userName");
+
+        activeEvents = EventService.GetEvents().Where(e => !e.IsCompleted).ToList();
+
+        if (!string.IsNullOrEmpty(userName))
+        {
+            var registeredIds = EventService.GetRegisteredEventIds(userName);
+            registeredEvents = activeEvents.Where(e => registeredIds.Contains(e.Id)).ToList();
+        }
+        else
+        {
+            registeredEvents = new List<Event>(); // fallback if userName is null
+        }
+    }
+}

@@ -1,0 +1,39 @@
+@page "/login"
+@inject LocalSessionService SessionTracker
+@inject NavigationManager Navigation
+
+<h3>Login</h3>
+
+@if (isLoggedIn)
+{
+    <p class="text-success">✅ You’re already logged in as <strong>@userName</strong>.</p>
+    <button class="btn btn-outline-danger" @onclick="Logout">Logout</button>
+}
+else
+{
+    <p>Click below to log in as a demo user:</p>
+    <button class="btn btn-primary" @onclick="LoginAsDemoUser">Login as User</button>
+}
+
+@code {
+    private string? userName;
+    private bool isLoggedIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        userName = await SessionTracker.GetItemAsync("userName");
+        isLoggedIn = !string.IsNullOrEmpty(userName);
+    }
+
+    private async Task LoginAsDemoUser()
+    {
+        await SessionTracker.SetItemAsync("userName", "User");
+        Navigation.NavigateTo("/events");
+    }
+
+    private async Task Logout()
+    {
+        await SessionTracker.RemoveItemAsync("userName");
+        Navigation.NavigateTo("/login", true);
+    }
+}

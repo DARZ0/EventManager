@@ -1,0 +1,90 @@
+@page "/my-events"
+@inject EventService EventService
+@inject NavigationManager Navigation
+@inject LocalSessionService SessionTracker
+
+<h3>🎟️ My Registered Events</h3>
+
+@if (registeredEvents.Count == 0)
+{
+    <p class="text-muted">You haven’t registered for any events yet.</p>
+}
+else
+{
+    <ul class="list-group">
+        @foreach (var r in registeredEvents)
+        {
+            <li class="list-group-item">
+                <strong>@r.RegisteredEvent?.Name</strong><br />
+                @r.RegisteredEvent?.Description<br />
+                <em>@r.RegisteredEvent?.Location</em><br />
+                <small>@r.RegisteredEvent?.Date.ToShortDateString()</small><br />
+
+                <span class="badge @(r.IsAttended ? "bg-success" : "bg-warning") mt-2">
+                    @(r.IsAttended ? "Attended" : "Registered")
+                </span>
+
+                <!-- Optional: Cancel button -->
+                <button class="btn btn-outline-danger btn-sm float-end" @onclick="() => CancelRegistration(r)">
+                    Remove
+                </button>
+                <button class="btn btn-outline-success btn-sm" @onclick="() => MarkAttendance(r)">
+                    @(r.IsAttended ? "✔ Attended" : "Mark Attended")
+                </button>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Registration> registeredEvents = new();
+    private string? userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 🧠 Track page visit
+        var visits = await SessionTracker.GetObjectAsync<List<string>>("pageVisits") ?? new();
+        visits.Add("Visited My Events at " + DateTime.Now);
+        await SessionTracker.SetObjectAsync("pageVisits", visits);
+
+        // 🔐 Get logged-in user
+        userName = await SessionTracker.GetItemAsync("userName");
+        if (string.IsNullOrEmpty(userName))
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        // 🎯 Get user's registrations
+        registeredEvents = EventService.GetRegistrations()
+        .Where(r => r.UserName == userName)
+        .ToList();
+    }
+
+    private async Task CancelRegistration(Registration registration)
+    {
+        // Remove from local list
+        registeredEvents.Remove(registration);
+
+        // Remove from service
+        EventService.GetRegistrations().Remove(registration);
+
+        // Remove event ID from userRegistrations dictionary
+        var eventId = registration.RegisteredEvent?.Id ?? -1;
+        if (eventId != -1 && EventService.HasRegistered(eventId, userName!))
+        {
+            var ids = EventService.GetRegisteredEventIds(userName!);
+            ids.Remove(eventId);
+        }
+
+        // Save changes
+        await EventService.SaveRegistrations();
+        await EventService.SaveUserRegistrations();
+    }
+
+    private async Task MarkAttendance(Registration r)
+    {
+        r.IsAttended = true;
+        await EventService.SaveRegistrations(); // persist change
+    }
+}

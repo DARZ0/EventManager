@@ -1,0 +1,88 @@
+@page "/register/{EventId:int}"
+@using System.Xml.Linq
+@inject NavigationManager Navigation
+@inject EventService EventService
+@inject LocalSessionService SessionTracker
+
+<h3>Register for Event</h3>
+
+@if (eventToRegister == null)
+{
+    <p class="text-danger">No events found.</p>
+}
+else
+{
+    <div>
+        <strong>@eventToRegister.Name</strong><br />
+        @eventToRegister.Description<br />
+        <em>@eventToRegister.Location</em><br />
+        <small>@eventToRegister.Date.ToShortDateString()</small>
+    </div>
+
+    <EditForm Model="@registration" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mt-3">
+            <label>Name:</label>
+            <InputText @bind-Value="registration.AttendeeName" class="form-control" />
+        </div>
+
+        <div class="mt-2">
+            <label>Email:</label>
+            <InputText @bind-Value="registration.Email" class="form-control" />
+        </div>
+
+        <button type="submit" class="btn btn-success mt-3">Register</button>
+    </EditForm>
+
+    @if (submitted == true)
+    {
+        <p class="text-success mt-3">✅ Registration successful!</p>
+    }
+}
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private Event? eventToRegister;
+    private Registration registration = new();
+    private bool submitted = false;
+
+    private string? userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        userName = await SessionTracker.GetItemAsync("userName");
+        eventToRegister = EventService.GetEvents().FirstOrDefault(e => e.Id == EventId);
+        var visits = await SessionTracker.GetObjectAsync<List<string>>("pageVisits") ?? new();
+        visits.Add("Visited Register Event at " + DateTime.Now);
+        await SessionTracker.SetObjectAsync("pageVisits", visits);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (eventToRegister != null && !string.IsNullOrEmpty(userName))
+        {
+            submitted = true;
+            await Task.Delay(1000); // Simulate a delay for registration processing
+            registration.RegisteredEvent = eventToRegister;
+            registration.UserName = userName;
+            await EventService.RegisterUser(registration, userName);
+            await EventService.SaveEvents();
+
+            // 🧠 Track registration locally
+            var registeredEvents = await SessionTracker.GetObjectAsync<List<int>>("registeredEventIds") ?? new();
+            if (!registeredEvents.Contains(eventToRegister.Id))
+            {
+                registeredEvents.Add(eventToRegister.Id);
+                await SessionTracker.SetObjectAsync("registeredEventIds", registeredEvents);
+            }
+
+            // 🚀 Redirect to Events page
+            Navigation.NavigateTo("/events");
+        }
+    }
+
+
+}
